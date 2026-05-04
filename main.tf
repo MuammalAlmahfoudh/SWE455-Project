@@ -125,6 +125,14 @@ resource "aws_security_group" "db" {
   description = "Allow PostgreSQL only from the EC2 security group"
   vpc_id      = aws_vpc.main.id
 
+  ingress {
+    description     = "Allow PostgreSQL only from the EC2 security group"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ec2.id]
+  }
+
   egress {
     description = "Allow outbound traffic"
     from_port   = 0
@@ -136,15 +144,6 @@ resource "aws_security_group" "db" {
   tags = {
     Name = "${var.project_name}-db-sg"
   }
-}
-
-resource "aws_security_group_rule" "db_ingress" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.db.id
-  source_security_group_id = aws_security_group.ec2.id
 }
 
 resource "aws_db_subnet_group" "main" {

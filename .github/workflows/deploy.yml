@@ -78,6 +78,100 @@ jobs:
       - name: Terraform init
         run: terraform init
 
+      - name: Import existing infrastructure
+        run: |
+          set -euo pipefail
+
+          PROJECT_NAME="volleyball-api"
+
+          tf_import() {
+            local address="$1"
+            local id="$2"
+
+            if [ -z "${id}" ] || [ "${id}" = "None" ]; then
+              return 0
+            fi
+
+            if terraform state show "${address}" >/dev/null 2>&1; then
+              return 0
+            fi
+
+            terraform import "${address}" "${id}"
+          }
+
+          VPC_ID="$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${PROJECT_NAME}-vpc" \
+            --query 'Vpcs[0].VpcId' \
+            --output text)"
+          tf_import aws_vpc.main "${VPC_ID}"
+
+          if [ "${VPC_ID}" != "None" ]; then
+            IGW_ID="$(aws ec2 describe-internet-gateways \
+              --filters "Name=attachment.vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-igw" \
+              --query 'InternetGateways[0].InternetGatewayId' \
+              --output text)"
+            tf_import aws_internet_gateway.main "${IGW_ID}"
+
+            SUBNET_1_ID="$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-1" \
+              --query 'Subnets[0].SubnetId' \
+              --output text)"
+            SUBNET_2_ID="$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-2" \
+              --query 'Subnets[0].SubnetId' \
+              --output text)"
+            tf_import 'aws_subnet.public[0]' "${SUBNET_1_ID}"
+            tf_import 'aws_subnet.public[1]' "${SUBNET_2_ID}"
+
+            ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
+              --query 'RouteTables[0].RouteTableId' \
+              --output text)"
+            tf_import aws_route_table.public "${ROUTE_TABLE_ID}"
+
+            if [ "${ROUTE_TABLE_ID}" != "None" ]; then
+              RTA_1_ID="$(aws ec2 describe-route-tables \
+                --route-table-ids "${ROUTE_TABLE_ID}" \
+                --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_1_ID}'].RouteTableAssociationId | [0]" \
+                --output text)"
+              RTA_2_ID="$(aws ec2 describe-route-tables \
+                --route-table-ids "${ROUTE_TABLE_ID}" \
+                --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_2_ID}'].RouteTableAssociationId | [0]" \
+                --output text)"
+              tf_import 'aws_route_table_association.public[0]' "${RTA_1_ID}"
+              tf_import 'aws_route_table_association.public[1]' "${RTA_2_ID}"
+            fi
+
+            EC2_SG_ID="$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${PROJECT_NAME}-ec2-sg" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text)"
+            DB_SG_ID="$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${PROJECT_NAME}-db-sg" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text)"
+            tf_import aws_security_group.ec2 "${EC2_SG_ID}"
+            tf_import aws_security_group.db "${DB_SG_ID}"
+          fi
+
+          DB_SUBNET_GROUP_NAME="$(aws rds describe-db-subnet-groups \
+            --db-subnet-group-name "${PROJECT_NAME}-db-subnet-group" \
+            --query 'DBSubnetGroups[0].DBSubnetGroupName' \
+            --output text 2>/dev/null || true)"
+          tf_import aws_db_subnet_group.main "${DB_SUBNET_GROUP_NAME}"
+
+          DB_INSTANCE_ID="$(aws rds describe-db-instances \
+            --db-instance-identifier "${PROJECT_NAME}-postgres" \
+            --query 'DBInstances[0].DBInstanceIdentifier' \
+            --output text 2>/dev/null || true)"
+          tf_import aws_db_instance.postgres "${DB_INSTANCE_ID}"
+
+          INSTANCE_ID="$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${PROJECT_NAME}-app" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)"
+          tf_import aws_instance.app "${INSTANCE_ID}"
+
       - name: Terraform apply
         env:
           TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
