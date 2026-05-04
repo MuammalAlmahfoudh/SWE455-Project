@@ -212,6 +212,7 @@ resource "aws_instance" "app" {
       --name volleyball-api \
       --restart unless-stopped \
       -p 3000:3000 \
+      -e NODE_ENV=production \
       -e PORT=3000 \
       -e DB_HOST=${aws_db_instance.postgres.address} \
       -e DB_USER=${var.db_username} \
