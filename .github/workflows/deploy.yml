@@ -134,16 +134,8 @@ jobs:
             tf_import aws_route_table.public "${ROUTE_TABLE_ID}"
 
             if [ "${ROUTE_TABLE_ID}" != "None" ]; then
-              RTA_1_ID="$(aws ec2 describe-route-tables \
-                --route-table-ids "${ROUTE_TABLE_ID}" \
-                --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_1_ID}'].RouteTableAssociationId | [0]" \
-                --output text)"
-              RTA_2_ID="$(aws ec2 describe-route-tables \
-                --route-table-ids "${ROUTE_TABLE_ID}" \
-                --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_2_ID}'].RouteTableAssociationId | [0]" \
-                --output text)"
-              tf_import 'aws_route_table_association.public[0]' "${RTA_1_ID}"
-              tf_import 'aws_route_table_association.public[1]' "${RTA_2_ID}"
+              tf_import 'aws_route_table_association.public[0]' "${SUBNET_1_ID}/${ROUTE_TABLE_ID}"
+              tf_import 'aws_route_table_association.public[1]' "${SUBNET_2_ID}/${ROUTE_TABLE_ID}"
             fi
 
             EC2_SG_ID="$(aws ec2 describe-security-groups \
