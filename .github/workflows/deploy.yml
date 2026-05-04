@@ -113,30 +113,39 @@ jobs:
             --output text 2>/dev/null || true)"
 
           if [ -n "${DB_INSTANCE_ID}" ] && [ "${DB_INSTANCE_ID}" != "None" ]; then
-            read -r SUBNET_1_ID SUBNET_2_ID <<< "$(aws rds describe-db-subnet-groups \
-              --db-subnet-group-name "${DB_SUBNET_GROUP_NAME}" \
-              --query 'sort_by(DBSubnetGroups[0].Subnets,&SubnetIdentifier)[].SubnetIdentifier' \
-              --output text)"
-
-            VPC_ID="$(aws ec2 describe-subnets \
-              --subnet-ids "${SUBNET_1_ID}" \
-              --query 'Subnets[0].VpcId' \
-              --output text)"
             DB_SG_ID="$(aws rds describe-db-instances \
               --db-instance-identifier "${DB_INSTANCE_ID}" \
               --query 'DBInstances[0].VpcSecurityGroups[0].VpcSecurityGroupId' \
+              --output text)"
+            VPC_ID="$(aws ec2 describe-security-groups \
+              --group-ids "${DB_SG_ID}" \
+              --query 'SecurityGroups[0].VpcId' \
+              --output text)"
+            SUBNET_1_ID="$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-1" \
+              --query 'Subnets[0].SubnetId' \
+              --output text)"
+            SUBNET_2_ID="$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-2" \
+              --query 'Subnets[0].SubnetId' \
               --output text)"
             EC2_SG_ID="$(aws ec2 describe-security-groups \
               --group-ids "${DB_SG_ID}" \
               --query 'SecurityGroups[0].IpPermissions[?FromPort==`5432` && ToPort==`5432`].UserIdGroupPairs[0].GroupId | [0]' \
               --output text)"
+            if [ -z "${EC2_SG_ID}" ] || [ "${EC2_SG_ID}" = "None" ]; then
+              EC2_SG_ID="$(aws ec2 describe-security-groups \
+                --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${PROJECT_NAME}-ec2-sg" \
+                --query 'SecurityGroups[0].GroupId' \
+                --output text)"
+            fi
             ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
-              --filters "Name=association.subnet-id,Values=${SUBNET_1_ID}" \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
               --query 'RouteTables[0].RouteTableId' \
               --output text)"
-            IGW_ID="$(aws ec2 describe-route-tables \
-              --route-table-ids "${ROUTE_TABLE_ID}" \
-              --query 'RouteTables[0].Routes[?DestinationCidrBlock==`0.0.0.0/0`].GatewayId | [0]' \
+            IGW_ID="$(aws ec2 describe-internet-gateways \
+              --filters "Name=attachment.vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-igw" \
+              --query 'InternetGateways[0].InternetGatewayId' \
               --output text)"
           else
             VPC_ID="$(aws ec2 describe-vpcs \
@@ -149,9 +158,13 @@ jobs:
                 --filters "Name=attachment.vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-igw" \
                 --query 'InternetGateways[0].InternetGatewayId' \
                 --output text)"
-              read -r SUBNET_1_ID SUBNET_2_ID <<< "$(aws ec2 describe-subnets \
-                --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-*" \
-                --query 'sort_by(Subnets,&SubnetId)[].SubnetId' \
+              SUBNET_1_ID="$(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-1" \
+                --query 'Subnets[0].SubnetId' \
+                --output text)"
+              SUBNET_2_ID="$(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-2" \
+                --query 'Subnets[0].SubnetId' \
                 --output text)"
               ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
                 --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
