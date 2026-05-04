@@ -170,8 +170,13 @@ resource "aws_db_instance" "postgres" {
   instance_class         = var.db_instance_class
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.db.id]
+  apply_immediately      = true
   publicly_accessible    = false
   skip_final_snapshot    = true
+
+  lifecycle {
+    ignore_changes = [engine_version]
+  }
 
   tags = {
     Name = "${var.project_name}-postgres"
