@@ -4,8 +4,13 @@ output "ec2_public_ip" {
 }
 
 output "app_url" {
-  description = "Public URL for the API."
+  description = "Public URL for the match service API."
   value       = "http://${aws_instance.app.public_ip}:3000"
+}
+
+output "analytics_url" {
+  description = "Public URL for the analytics service API."
+  value       = "http://${aws_instance.app.public_ip}:3001"
 }
 
 output "db_endpoint" {

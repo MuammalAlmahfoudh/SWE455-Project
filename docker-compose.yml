@@ -5,7 +5,27 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
+      SERVICE_LABEL: Volleyball Match Service running
       PORT: 3000
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: volleyball_analytics
+      DB_PORT: 5432
+    depends_on:
+      - db
+    networks:
+      - volleyball-network
+
+  analytics:
+    build: .
+    command: npm run start:analytics
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      SERVICE_LABEL: Volleyball Analytics Service running
+      PORT: 3001
       DB_HOST: db
       DB_USER: postgres
       DB_PASSWORD: password

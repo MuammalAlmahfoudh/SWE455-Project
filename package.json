@@ -5,7 +5,9 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start:analytics": "node analytics.js",
+    "dev": "nodemon app.js",
+    "dev:analytics": "nodemon analytics.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

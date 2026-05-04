@@ -92,6 +92,14 @@ resource "aws_security_group" "ec2" {
   }
 
   ingress {
+    description = "HTTP analytics API"
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_app_cidr_blocks
+  }
+
+  ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
@@ -207,12 +215,13 @@ resource "aws_instance" "app" {
     sudo docker --version
 
     sudo docker pull ${var.container_image}
-    sudo docker rm -f volleyball-api || true
+    sudo docker rm -f volleyball-api volleyball-analytics || true
     sudo docker run -d \
       --name volleyball-api \
       --restart unless-stopped \
       -p 3000:3000 \
       -e NODE_ENV=production \
+      -e SERVICE_LABEL="Volleyball Match Service running" \
       -e PORT=3000 \
       -e DB_HOST=${aws_db_instance.postgres.address} \
       -e DB_USER=${var.db_username} \
@@ -220,6 +229,20 @@ resource "aws_instance" "app" {
       -e DB_NAME=${var.db_name} \
       -e DB_PORT=5432 \
       ${var.container_image}
+
+    sudo docker run -d \
+      --name volleyball-analytics \
+      --restart unless-stopped \
+      -p 3001:3001 \
+      -e NODE_ENV=production \
+      -e SERVICE_LABEL="Volleyball Analytics Service running" \
+      -e PORT=3001 \
+      -e DB_HOST=${aws_db_instance.postgres.address} \
+      -e DB_USER=${var.db_username} \
+      -e DB_PASSWORD=${var.db_password} \
+      -e DB_NAME=${var.db_name} \
+      -e DB_PORT=5432 \
+      ${var.container_image} npm run start:analytics
 
     sleep 10
 
@@ -230,11 +253,17 @@ resource "aws_instance" "app" {
       echo "===== docker logs volleyball-api ====="
       sudo docker logs volleyball-api || true
       echo
-      echo "===== listening ports ====="
-      sudo ss -tulpen | grep ':3000' || true
+      echo "===== docker logs volleyball-analytics ====="
+      sudo docker logs volleyball-analytics || true
       echo
-      echo "===== local /info test ====="
+      echo "===== listening ports ====="
+      sudo ss -tulpen | grep -E ':3000|:3001' || true
+      echo
+      echo "===== local match service /info test ====="
       curl -sS -m 5 http://localhost:3000/info || true
+      echo
+      echo "===== local analytics service /info test ====="
+      curl -sS -m 5 http://localhost:3001/info || true
       echo
       echo "===== user_data finished at $(date -Is) ====="
     } >> "$DEBUG_LOG" 2>&1

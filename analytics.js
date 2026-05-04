@@ -4,26 +4,22 @@ require('dotenv').config();
 const { runHttpService } = require('./src/config/runHttpService');
 
 const healthRoutes = require('./src/routes/healthRoutes');
-const matchRoutes = require('./src/routes/matchRoutes');
-const setRoutes = require('./src/routes/setRoutes');
-const rallyRoutes = require('./src/routes/rallyRoutes');
+const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const infoRoutes = require('./src/routes/infoRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
 
 app.use(healthRoutes);
-app.use(matchRoutes);
-app.use('/', setRoutes);
-app.use('/', rallyRoutes);
+app.use('/', analyticsRoutes);
 app.use('/', infoRoutes);
 
 void runHttpService({
   app,
   port: PORT,
-  serviceName: 'match-service',
+  serviceName: 'analytics-service',
 });
 
 module.exports = app;

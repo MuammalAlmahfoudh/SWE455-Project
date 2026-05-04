@@ -2,7 +2,7 @@
 
 ## Project Description
 
-This project is a Node.js and Express.js backend API for managing volleyball matches, sets, rallies, and match analytics. It stores match data in PostgreSQL and supports deployment using Docker, Docker Compose, Terraform, AWS EC2, and AWS RDS.
+This project is a Node.js and Express.js backend architecture for managing volleyball matches, sets, rallies, and match analytics. It is split into two functional services backed by PostgreSQL and supports deployment using Docker, Docker Compose, Terraform, AWS EC2, and AWS RDS.
 
 The system was built for a SWE 455 Cloud Applications Engineering project and follows a clean backend structure with routes, controllers, services, models, and configuration files.
 
@@ -15,16 +15,16 @@ Client / Postman
       v
 Internet Gateway
       |
-      | Port 3000
+      | Ports 3000 and 3001
       v
 AWS EC2 Instance
       |
-      | Docker container running Node.js Express API
+      | Docker containers running Match Service and Analytics Service
       v
 AWS RDS PostgreSQL
 ```
 
-The Express API runs inside a Docker container on EC2. PostgreSQL runs as an external database service using AWS RDS. The backend is stateless, and all persistent match, set, rally, and analytics data is stored in PostgreSQL.
+The Match Service runs on port 3000 and handles match, set, and rally writes. The Analytics Service runs on port 3001 and serves analytics queries. PostgreSQL runs as an external database service using AWS RDS. Both services are stateless, and all persistent data is stored in PostgreSQL.
 
 ## Tech Stack
 
@@ -65,6 +65,7 @@ Additional GitHub secrets for Terraform deployment:
 ```text
 .
 ├── app.js
+├── analytics.js
 ├── package.json
 ├── schema.sql
 ├── Dockerfile
@@ -106,16 +107,23 @@ createdb volleyball_analytics
 psql -h localhost -U postgres -d volleyball_analytics -f schema.sql
 ```
 
-Start the server:
+Start the match service:
 
 ```bash
 npm start
+```
+
+Start the analytics service in a second terminal:
+
+```bash
+npm run start:analytics
 ```
 
 Test:
 
 ```bash
 curl http://localhost:3000/info
+curl http://localhost:3001/info
 ```
 
 ## Run With Docker
@@ -126,10 +134,11 @@ Build the Docker image:
 docker build -t volleyball-api .
 ```
 
-Run the API container:
+Run the match service container:
 
 ```bash
 docker run -p 3000:3000 \
+  -e SERVICE_LABEL="Volleyball Match Service running" \
   -e DB_HOST=host.docker.internal \
   -e DB_USER=postgres \
   -e DB_PASSWORD=password \
@@ -138,7 +147,21 @@ docker run -p 3000:3000 \
   volleyball-api
 ```
 
-Run API and PostgreSQL together with Docker Compose:
+Run the analytics service container:
+
+```bash
+docker run -p 3001:3001 \
+  -e SERVICE_LABEL="Volleyball Analytics Service running" \
+  -e PORT=3001 \
+  -e DB_HOST=host.docker.internal \
+  -e DB_USER=postgres \
+  -e DB_PASSWORD=password \
+  -e DB_NAME=volleyball_analytics \
+  -e DB_PORT=5432 \
+  volleyball-api npm run start:analytics
+```
+
+Run both services and PostgreSQL together with Docker Compose:
 
 ```bash
 docker-compose up --build
@@ -148,6 +171,7 @@ Test:
 
 ```bash
 curl http://localhost:3000/info
+curl http://localhost:3001/info
 ```
 
 ## Deploy With Terraform
@@ -158,7 +182,7 @@ Terraform creates:
 - Public subnets
 - Internet gateway
 - Security groups
-- EC2 instance running the Docker container
+- EC2 instance running both Docker service containers
 - RDS PostgreSQL instance
 
 Initialize Terraform:
@@ -189,16 +213,18 @@ terraform apply \
   -var="ec2_key_name=YOUR_AWS_KEY_PAIR_NAME"
 ```
 
-Get the application URL:
+Get the service URLs:
 
 ```bash
 terraform output app_url
+terraform output analytics_url
 ```
 
 Test cloud deployment:
 
 ```bash
 curl http://<EC2_PUBLIC_IP>:3000/info
+curl http://<EC2_PUBLIC_IP>:3001/info
 ```
 
 SSH into EC2:
@@ -217,14 +243,16 @@ cat /home/ec2-user/debug.log
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Health check endpoint. |
-| `GET` | `/info` | Returns API runtime information for deployment verification. |
-| `POST` | `/matches` | Creates a new volleyball match. |
-| `GET` | `/matches/:id` | Returns match details by ID. |
-| `POST` | `/matches/:id/sets` | Creates a set for a match. |
-| `GET` | `/matches/:id/sets` | Returns all sets for a match. |
-| `POST` | `/rallies` | Creates a rally and updates the set score. |
-| `GET` | `/matches/:id/analytics` | Returns match analytics computed from rallies. |
+| `GET` | `http://<host>:3000/health` | Match service health check. |
+| `GET` | `http://<host>:3000/info` | Match service runtime information. |
+| `POST` | `http://<host>:3000/matches` | Creates a new volleyball match. |
+| `GET` | `http://<host>:3000/matches/:id` | Returns match details by ID. |
+| `POST` | `http://<host>:3000/matches/:id/sets` | Creates a set for a match. |
+| `GET` | `http://<host>:3000/matches/:id/sets` | Returns all sets for a match. |
+| `POST` | `http://<host>:3000/rallies` | Creates a rally and updates the set score. |
+| `GET` | `http://<host>:3001/health` | Analytics service health check. |
+| `GET` | `http://<host>:3001/info` | Analytics service runtime information. |
+| `GET` | `http://<host>:3001/matches/:id/analytics` | Returns match analytics computed from rallies. |
 
 ## Example Requests
 
@@ -255,5 +283,5 @@ curl -X POST http://localhost:3000/rallies \
 Get analytics:
 
 ```bash
-curl http://localhost:3000/matches/1/analytics
+curl http://localhost:3001/matches/1/analytics
 ```
