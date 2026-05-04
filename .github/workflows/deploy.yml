@@ -121,14 +121,20 @@ jobs:
               --group-ids "${DB_SG_ID}" \
               --query 'SecurityGroups[0].VpcId' \
               --output text)"
-            SUBNET_1_ID="$(aws ec2 describe-subnets \
-              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-1" \
-              --query 'Subnets[0].SubnetId' \
-              --output text)"
-            SUBNET_2_ID="$(aws ec2 describe-subnets \
-              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-2" \
-              --query 'Subnets[0].SubnetId' \
-              --output text)"
+            read -r TAGGED_SUBNET_1 TAGGED_SUBNET_2 <<< "$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-1,${PROJECT_NAME}-public-2" \
+              --query 'sort_by(Subnets,&AvailabilityZone)[].SubnetId' \
+              --output text 2>/dev/null || true)"
+
+            if [ -n "${TAGGED_SUBNET_1}" ] && [ "${TAGGED_SUBNET_1}" != "None" ] && [ -n "${TAGGED_SUBNET_2}" ] && [ "${TAGGED_SUBNET_2}" != "None" ]; then
+              SUBNET_1_ID="${TAGGED_SUBNET_1}"
+              SUBNET_2_ID="${TAGGED_SUBNET_2}"
+            else
+              read -r SUBNET_1_ID SUBNET_2_ID <<< "$(aws ec2 describe-subnets \
+                --filters "Name=vpc-id,Values=${VPC_ID}" \
+                --query 'sort_by(Subnets,&AvailabilityZone)[].SubnetId' \
+                --output text)"
+            fi
             EC2_SG_ID="$(aws ec2 describe-security-groups \
               --group-ids "${DB_SG_ID}" \
               --query 'SecurityGroups[0].IpPermissions[?FromPort==`5432` && ToPort==`5432`].UserIdGroupPairs[0].GroupId | [0]' \
@@ -140,11 +146,11 @@ jobs:
                 --output text)"
             fi
             ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
-              --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
-              --query 'RouteTables[0].RouteTableId' \
+              --filters "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'RouteTables[?Routes[?DestinationCidrBlock==`0.0.0.0/0` && GatewayId!=null]][0].RouteTableId' \
               --output text)"
             IGW_ID="$(aws ec2 describe-internet-gateways \
-              --filters "Name=attachment.vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-igw" \
+              --filters "Name=attachment.vpc-id,Values=${VPC_ID}" \
               --query 'InternetGateways[0].InternetGatewayId' \
               --output text)"
           else
@@ -188,8 +194,22 @@ jobs:
           tf_import aws_route_table.public "${ROUTE_TABLE_ID}"
 
           if [ "${ROUTE_TABLE_ID}" != "None" ]; then
-            tf_import 'aws_route_table_association.public[0]' "${SUBNET_1_ID}/${ROUTE_TABLE_ID}"
-            tf_import 'aws_route_table_association.public[1]' "${SUBNET_2_ID}/${ROUTE_TABLE_ID}"
+            RTA_1_ID="$(aws ec2 describe-route-tables \
+              --route-table-ids "${ROUTE_TABLE_ID}" \
+              --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_1_ID}'].RouteTableAssociationId | [0]" \
+              --output text 2>/dev/null || true)"
+            RTA_2_ID="$(aws ec2 describe-route-tables \
+              --route-table-ids "${ROUTE_TABLE_ID}" \
+              --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_2_ID}'].RouteTableAssociationId | [0]" \
+              --output text 2>/dev/null || true)"
+
+            if [ -n "${RTA_1_ID}" ] && [ "${RTA_1_ID}" != "None" ]; then
+              tf_import 'aws_route_table_association.public[0]' "${SUBNET_1_ID}/${ROUTE_TABLE_ID}"
+            fi
+
+            if [ -n "${RTA_2_ID}" ] && [ "${RTA_2_ID}" != "None" ]; then
+              tf_import 'aws_route_table_association.public[1]' "${SUBNET_2_ID}/${ROUTE_TABLE_ID}"
+            fi
           fi
 
           tf_import aws_security_group.ec2 "${EC2_SG_ID}"
