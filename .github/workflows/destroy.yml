@@ -41,10 +41,26 @@ jobs:
           chmod +x scripts/import-existing-infra.sh
           ./scripts/import-existing-infra.sh
 
-      - name: Terraform destroy
-        run: >
-          terraform destroy -input=false -auto-approve
-          -var="container_image=${{ env.IMAGE_NAME }}:latest"
+      - name: Terraform destroy with retries
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            echo "Destroy attempt ${attempt} of 3"
+
+            if terraform destroy -input=false -auto-approve \
+              -var="container_image=${{ env.IMAGE_NAME }}:latest"; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 3 ]; then
+              echo "Terraform destroy failed after 3 attempts."
+              exit 1
+            fi
+
+            echo "Terraform destroy hit an AWS dependency race. Waiting 90 seconds before retrying..."
+            sleep 90
+          done
 
   missing-confirmation:
     runs-on: ubuntu-latest
