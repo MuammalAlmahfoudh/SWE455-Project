@@ -57,7 +57,6 @@ Additional GitHub secrets for Terraform deployment:
 
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- `EC2_KEY_NAME`
 - `DB_PASSWORD`
 
 ## Project Structure
@@ -201,16 +200,14 @@ Plan deployment:
 
 ```bash
 terraform plan \
-  -var="container_image=muammalzuhair/volleyball-api:latest" \
-  -var="ec2_key_name=YOUR_AWS_KEY_PAIR_NAME"
+  -var="container_image=muammalzuhair/volleyball-api:latest"
 ```
 
 Apply deployment:
 
 ```bash
 terraform apply \
-  -var="container_image=muammalzuhair/volleyball-api:latest" \
-  -var="ec2_key_name=YOUR_AWS_KEY_PAIR_NAME"
+  -var="container_image=muammalzuhair/volleyball-api:latest"
 ```
 
 Get the service URLs:
@@ -225,18 +222,6 @@ Test cloud deployment:
 ```bash
 curl http://<EC2_PUBLIC_IP>:3000/info
 curl http://<EC2_PUBLIC_IP>:3001/info
-```
-
-SSH into EC2:
-
-```bash
-ssh -i /path/to/key.pem ec2-user@<EC2_PUBLIC_IP>
-```
-
-Check deployment logs on EC2:
-
-```bash
-cat /home/ec2-user/debug.log
 ```
 
 ## API Endpoints Summary

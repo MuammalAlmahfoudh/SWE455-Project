@@ -22,11 +22,6 @@ variable "ec2_instance_type" {
   default     = "t3.micro"
 }
 
-variable "ec2_key_name" {
-  description = "Name of an existing AWS EC2 key pair in the selected region."
-  type        = string
-}
-
 variable "container_image" {
   description = "Public Docker Hub image for the volleyball API."
   type        = string

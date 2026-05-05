@@ -186,7 +186,6 @@ resource "aws_db_instance" "postgres" {
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.ec2_instance_type
-  key_name                    = var.ec2_key_name
   subnet_id                   = aws_subnet.public[0].id
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.ec2.id]
