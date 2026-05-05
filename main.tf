@@ -235,6 +235,8 @@ resource "aws_instance" "app" {
       -e DB_PASSWORD=${var.db_password} \
       -e DB_NAME=${var.db_name} \
       -e DB_PORT=5432 \
+      -e DB_SSL=true \
+      -e DB_SSL_REJECT_UNAUTHORIZED=false \
       ${var.container_image}
 
     sudo docker run -d \
@@ -249,6 +251,8 @@ resource "aws_instance" "app" {
       -e DB_PASSWORD=${var.db_password} \
       -e DB_NAME=${var.db_name} \
       -e DB_PORT=5432 \
+      -e DB_SSL=true \
+      -e DB_SSL_REJECT_UNAUTHORIZED=false \
       ${var.container_image} npm run start:analytics
 
     sleep 10

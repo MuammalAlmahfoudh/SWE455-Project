@@ -31,6 +31,7 @@ jobs:
       - name: Run basic checks
         run: |
           node --check app.js
+          node --check analytics.js
           find src -name "*.js" -print0 | xargs -0 -n1 node --check
 
       - name: Log in to Docker Hub
