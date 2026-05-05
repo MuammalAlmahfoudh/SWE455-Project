@@ -14,7 +14,8 @@ provider "aws" {
 }
 
 locals {
-  public_subnet_count = 2
+  public_subnet_count    = 2
+  api_gateway_stage_name = "prod"
 }
 
 data "aws_availability_zones" "available" {
@@ -285,4 +286,253 @@ resource "aws_instance" "app" {
   tags = {
     Name = "${var.project_name}-app"
   }
+}
+
+resource "aws_api_gateway_rest_api" "gateway" {
+  name              = "${var.project_name}-gateway"
+  description       = "API Gateway entry point for the volleyball match and analytics services."
+  put_rest_api_mode = "overwrite"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+
+  body = jsonencode({
+    swagger = "2.0"
+    info = {
+      title   = "Volleyball API Gateway"
+      version = "1.0.0"
+    }
+    schemes = ["https"]
+    paths = {
+      "/health" = {
+        get = {
+          responses = {
+            "200" = {
+              description = "Match service health response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/health"
+          }
+        }
+      }
+      "/info" = {
+        get = {
+          responses = {
+            "200" = {
+              description = "Match service info response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/info"
+          }
+        }
+      }
+      "/matches" = {
+        post = {
+          consumes = ["application/json"]
+          responses = {
+            "201" = {
+              description = "Match created"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "POST"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/matches"
+          }
+        }
+      }
+      "/matches/{id}" = {
+        get = {
+          parameters = [
+            {
+              name     = "id"
+              in       = "path"
+              required = true
+              type     = "string"
+            }
+          ]
+          responses = {
+            "200" = {
+              description = "Match lookup response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/matches/{id}"
+            requestParameters = {
+              "integration.request.path.id" = "method.request.path.id"
+            }
+          }
+        }
+      }
+      "/matches/{id}/sets" = {
+        get = {
+          parameters = [
+            {
+              name     = "id"
+              in       = "path"
+              required = true
+              type     = "string"
+            }
+          ]
+          responses = {
+            "200" = {
+              description = "Set list response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/matches/{id}/sets"
+            requestParameters = {
+              "integration.request.path.id" = "method.request.path.id"
+            }
+          }
+        }
+        post = {
+          consumes = ["application/json"]
+          parameters = [
+            {
+              name     = "id"
+              in       = "path"
+              required = true
+              type     = "string"
+            }
+          ]
+          responses = {
+            "201" = {
+              description = "Set created"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "POST"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/matches/{id}/sets"
+            requestParameters = {
+              "integration.request.path.id" = "method.request.path.id"
+            }
+          }
+        }
+      }
+      "/matches/{id}/analytics" = {
+        get = {
+          parameters = [
+            {
+              name     = "id"
+              in       = "path"
+              required = true
+              type     = "string"
+            }
+          ]
+          responses = {
+            "200" = {
+              description = "Match analytics response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3001/matches/{id}/analytics"
+            requestParameters = {
+              "integration.request.path.id" = "method.request.path.id"
+            }
+          }
+        }
+      }
+      "/rallies" = {
+        post = {
+          consumes = ["application/json"]
+          responses = {
+            "201" = {
+              description = "Rally created"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "POST"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3000/rallies"
+          }
+        }
+      }
+      "/analytics/health" = {
+        get = {
+          responses = {
+            "200" = {
+              description = "Analytics service health response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3001/health"
+          }
+        }
+      }
+      "/analytics/info" = {
+        get = {
+          responses = {
+            "200" = {
+              description = "Analytics service info response"
+            }
+          }
+          x-amazon-apigateway-integration = {
+            type                = "http_proxy"
+            httpMethod          = "GET"
+            connectionType      = "INTERNET"
+            passthroughBehavior = "when_no_match"
+            uri                 = "http://${aws_instance.app.public_ip}:3001/info"
+          }
+        }
+      }
+    }
+  })
+
+  depends_on = [aws_instance.app]
+}
+
+resource "aws_api_gateway_deployment" "gateway" {
+  rest_api_id = aws_api_gateway_rest_api.gateway.id
+
+  triggers = {
+    redeployment = sha1(jsonencode({
+      api_body         = aws_api_gateway_rest_api.gateway.body
+      match_service_ip = aws_instance.app.public_ip
+    }))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "gateway" {
+  rest_api_id   = aws_api_gateway_rest_api.gateway.id
+  deployment_id = aws_api_gateway_deployment.gateway.id
+  stage_name    = local.api_gateway_stage_name
 }

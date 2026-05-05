@@ -247,6 +247,22 @@ jobs:
             --output text)"
           tf_import aws_instance.app "${INSTANCE_ID}"
 
+          REST_API_ID="$(aws apigateway get-rest-apis \
+            --query "items[?name=='${PROJECT_NAME}-gateway'].id | [0]" \
+            --output text 2>/dev/null || true)"
+          tf_import aws_api_gateway_rest_api.gateway "${REST_API_ID}"
+
+          if [ -n "${REST_API_ID}" ] && [ "${REST_API_ID}" != "None" ]; then
+            STAGE_NAME="$(aws apigateway get-stage \
+              --rest-api-id "${REST_API_ID}" \
+              --stage-name "prod" \
+              --query 'stageName' \
+              --output text 2>/dev/null || true)"
+            if [ -n "${STAGE_NAME}" ] && [ "${STAGE_NAME}" != "None" ]; then
+              tf_import aws_api_gateway_stage.gateway "${REST_API_ID}/${STAGE_NAME}"
+            fi
+          fi
+
       - name: Terraform apply
         run: >
           terraform apply -input=false -auto-approve
