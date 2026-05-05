@@ -145,9 +145,21 @@ jobs:
                 --output text)"
             fi
             ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
-              --filters "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'RouteTables[?Routes[?DestinationCidrBlock==`0.0.0.0/0` && GatewayId!=null]][0].RouteTableId' \
+              --filters "Name=association.subnet-id,Values=${SUBNET_1_ID}" \
+              --query 'RouteTables[0].RouteTableId' \
               --output text)"
+            if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+              ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
+                --filters "Name=association.subnet-id,Values=${SUBNET_2_ID}" \
+                --query 'RouteTables[0].RouteTableId' \
+                --output text)"
+            fi
+            if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+              ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
+                --filters "Name=vpc-id,Values=${VPC_ID}" \
+                --query 'RouteTables[?Routes[?DestinationCidrBlock==`0.0.0.0/0` && GatewayId!=null]][0].RouteTableId' \
+                --output text)"
+            fi
             IGW_ID="$(aws ec2 describe-internet-gateways \
               --filters "Name=attachment.vpc-id,Values=${VPC_ID}" \
               --query 'InternetGateways[0].InternetGatewayId' \
@@ -172,9 +184,21 @@ jobs:
                 --query 'Subnets[0].SubnetId' \
                 --output text)"
               ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
-                --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
+                --filters "Name=association.subnet-id,Values=${SUBNET_1_ID}" \
                 --query 'RouteTables[0].RouteTableId' \
                 --output text)"
+              if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+                ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
+                  --filters "Name=association.subnet-id,Values=${SUBNET_2_ID}" \
+                  --query 'RouteTables[0].RouteTableId' \
+                  --output text)"
+              fi
+              if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+                ROUTE_TABLE_ID="$(aws ec2 describe-route-tables \
+                  --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PROJECT_NAME}-public-rt" \
+                  --query 'RouteTables[0].RouteTableId' \
+                  --output text)"
+              fi
               EC2_SG_ID="$(aws ec2 describe-security-groups \
                 --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=${PROJECT_NAME}-ec2-sg" \
                 --query 'SecurityGroups[0].GroupId' \
