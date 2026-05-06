@@ -41,25 +41,31 @@ jobs:
           chmod +x scripts/import-existing-infra.sh
           ./scripts/import-existing-infra.sh
 
-      - name: Terraform destroy with retries
+      - name: Terraform destroy with dependency cleanup
         run: |
           set -euo pipefail
+
+          chmod +x scripts/cleanup-vpc-dependencies.sh
 
           for attempt in 1 2 3; do
             echo "Destroy attempt ${attempt} of 3"
 
             if terraform destroy -input=false -auto-approve \
               -var="container_image=${{ env.IMAGE_NAME }}:latest"; then
+              echo "Terraform destroy succeeded."
               exit 0
             fi
+
+            echo "Terraform destroy failed. Running VPC dependency cleanup."
+            AWS_REGION=us-east-1 PROJECT_NAME=volleyball-api ./scripts/cleanup-vpc-dependencies.sh
 
             if [ "${attempt}" -eq 3 ]; then
               echo "Terraform destroy failed after 3 attempts."
               exit 1
             fi
 
-            echo "Terraform destroy hit an AWS dependency race. Waiting 90 seconds before retrying..."
-            sleep 90
+            echo "Waiting 120 seconds before retrying..."
+            sleep 120
           done
 
   missing-confirmation:
