@@ -5,6 +5,18 @@ set -euo pipefail
 PROJECT_NAME="${PROJECT_NAME:-volleyball-api}"
 API_GATEWAY_STAGE_NAME="${API_GATEWAY_STAGE_NAME:-prod}"
 
+VPC_ID=""
+IGW_ID=""
+SUBNET_1_ID=""
+SUBNET_2_ID=""
+ROUTE_TABLE_ID=""
+EC2_SG_ID=""
+DB_SG_ID=""
+DB_SUBNET_GROUP_NAME=""
+DB_INSTANCE_ID=""
+INSTANCE_ID=""
+REST_API_ID=""
+
 tf_import() {
   local address="$1"
   local id="$2"
@@ -134,7 +146,7 @@ tf_import 'aws_subnet.public[0]' "${SUBNET_1_ID}"
 tf_import 'aws_subnet.public[1]' "${SUBNET_2_ID}"
 tf_import aws_route_table.public "${ROUTE_TABLE_ID}"
 
-if [ "${ROUTE_TABLE_ID}" != "None" ]; then
+if [ -n "${ROUTE_TABLE_ID}" ] && [ "${ROUTE_TABLE_ID}" != "None" ]; then
   RTA_1_ID="$(aws ec2 describe-route-tables \
     --route-table-ids "${ROUTE_TABLE_ID}" \
     --query "RouteTables[0].Associations[?SubnetId=='${SUBNET_1_ID}'].RouteTableAssociationId | [0]" \
